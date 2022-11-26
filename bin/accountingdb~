@@ -1,0 +1,685 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+/**
+ * ./bin/accountingdb --persist-account --iban FR76928836647839290734 --currencyId 1 --bankId 2
+ * ./bin/accountingdb --persist-currency --longName 'Bath thaïlandais' --symbol '฿' --code THB
+ * ./bin/accountingdb --persist-bank --longName 'Crédit mutuel' --code CMU --bic CRMUFRPP
+ * ./bin/accountingdb --persist-statement --electronicSeqNr 226 --creationDateTime '2022-09-08 21:30:43' --accountId 3 --balanceId 1
+ * ./bin/accountingdb --persist-balance --typeCodeId 2 --proprietaryType HGDF --subTypeCodeId 3 --ammount 25432.76 --creditDebit 'credit' --dateTime '2022-09-08 21:30:43' --numberOfEntries 8 --sumOfEntries 2543.65
+ */
+
+// Use db.js app: openDb
+var accountingdb = require('../db');
+// Debug
+var debug = require('debug')('rapr,express,accountingdb:*');
+// FS API
+var fs = require('fs');
+// Child process for running system commands
+const { exec } = require("child_process");
+// Request promise
+var rp = require('request-promise');
+
+function doInitDB() {
+    /* Delete the file */
+    console.log('Deleting DB file '+sqlitedb_filepath+' ...');
+    fs.unlink(sqlitedb_filepath, (err) => {
+	if (err && (err.code != 'ENOENT' || err.errno != -4058))
+	    throw err;
+	else if (err && err.code == 'ENOENT' && err.errno == -4058)
+	    console.log('Delete DB file: no such file or directory: done!');
+	else
+	    console.log('Delete DB file: done!');
+
+	console.log('initdb: open DB ...');
+	accountingdb.openDb();
+	accountingdb.accountingdb.serialize(() =>
+	    {
+		/* Create tables & records for initializing DB */
+		console.log("initdb: Creating tables schema in DB ...");
+		accountingdb.accountingdb.run("PRAGMA foreign_keys = ON;")
+		/*
+		 * BEGIN TRANSACTION
+		 */
+		console.log("initdb: Opening transaction ...");
+		accountingdb.accountingdb.run("BEGIN TRANSACTION;");
+		/*
+		 * Table Accounts
+		 */
+		console.log("initdb: Create table 'Accounts' ...");
+		accountingdb.accountingdb.run("CREATE TABLE IF NOT EXISTS Accounts   (id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \
+                                                                                      Iban        TEXT    NOT NULL, \
+                                                                                      BankId      INTEGER NOT NULL, \
+                                                                                      CurrencyId  INTEGER NOT NULL, \
+                                                                                      FOREIGN KEY (BankId)     REFERENCES Banks (id), \
+                                                                                      FOREIGN KEY (CurrencyId) REFERENCES Currencies (id), \
+                                                                                      UNIQUE(id))");
+		console.log("initdb: Table 'Accounts' created!");
+		/*
+		 * Table Currencies
+		 */
+		console.log("initdb: Create table 'Currrencies' ...");
+		accountingdb.accountingdb.run("CREATE TABLE IF NOT EXISTS Currencies (id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \
+                                                                                      LongName    TEXT, \
+                                                                                      Symbol      TEXT NOT NULL, \
+                                                                                      Code        TEXT NOT NULL, \
+                                                                                      UNIQUE(id), \
+                                                                                      UNIQUE(Symbol))");
+		console.log("initdb: Table 'Currencies' created!");
+		console.log("initdb: Adding records in table Currencies ...");
+		accountingdb.accountingdb.run("INSERT INTO Currencies (LongName, Symbol, Code) \
+                                                      VALUES          ('Euro',   '€',    'EUR'), \
+                                                                      ('Dollar', '$',    'USD'), \
+                                                                      ('Pound',  '£',    'GBP');");
+		console.log("initdb: Added 'Currencies' records in DB!");
+		/*
+		 * Table Banks
+		 */
+		console.log("initdb: Create 'Banks' table ...");
+		accountingdb.accountingdb.run("CREATE TABLE IF NOT EXISTS Banks      (id          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \
+                                                                                      LongName    TEXT, \
+                                                                                      Code        TEXT NOT NULL, \
+                                                                                      Bic         TEXT NOT NULL, \
+                                                                                      UNIQUE(id), \
+                                                                                      UNIQUE(Bic))");
+		console.log("initdb: Table 'Banks' created!");
+		console.log("initdb: Adding records in table 'Banks' ...");
+		accountingdb.accountingdb.run("INSERT INTO Banks (LongName,           Code,   Bic) \
+                                                      VALUES     ('Crédit du Nord',   'CdN',  'NORDFRPP'), \
+                                                                 ('Crédit Agricole',  'CA',   'AGRIFRPP'), \
+                                                                 ('Crédit Lyonnais',  'CL',   'CRLYFRPP'), \
+                                                                 ('HSBC',             'HSBC', 'CCFRFRPP'), \
+                                                                 ('Société Générale', 'SG',   'SOGEFRPP');");
+		console.log("initdb: Added 'Banks' records in DB!");
+		/*
+		 * Table Statements
+		 */
+		console.log("initdb: Create 'Statements' table ...");
+		accountingdb.accountingdb.run("CREATE TABLE IF NOT EXISTS Statements (id                      INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \
+                                                                                      ElectronicSeqNr         TEXT, \
+                                                                                      CreationDateTime        TEXT DEFAULT 0 NOT NULL, \
+                                                                                      AccountId               INTEGER NOT NULL, \
+                                                                                      BalanceId               INTEGER NOT NULL, \
+                                                                                      FOREIGN KEY (AccountId) REFERENCES Accounts (id), \
+                                                                                      FOREIGN KEY (BalanceId) REFERENCES Balances (id), \
+                                                                                      UNIQUE(id))");
+		console.log("initdb: Table 'Statements' created!");
+		/*
+		 * Table Balances
+		 */
+		console.log("initdb: Create 'Balances' table ...");
+		accountingdb.accountingdb.run("CREATE TABLE IF NOT EXISTS Balances   (id                          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \
+                                                                                      TypeCodeId                  INTEGER NOT NULL, \
+                                                                                      ProprietaryType             TEXT, \
+                                                                                      SubTypeCodeId               INTEGER NOT NULL, \
+                                                                                      Ammount                     REAL NOT NULL, \
+                                                                                      CreditDebit                 TEXT NOT NULL, \
+                                                                                      DateTime                    TEXT DEFAULT 0 NOT NULL, \
+                                                                                      NumberOfEntries             INTEGER NOT NULL, \
+                                                                                      SumOfEntries                REAL NOT NULL, \
+                                                                                      FOREIGN KEY (TypeCodeId)    REFERENCES BalanceTypeCodes (id), \
+                                                                                      FOREIGN KEY (SubTypeCodeId) REFERENCES BalanceTypeCodes (id), \
+                                                                                      UNIQUE(id))");
+		console.log("initdb: Table 'Balances' created!");
+		/*
+		 * Table BalanceTypeCodes
+		 */
+		console.log("initdb: Create 'BalanceTypeCodes' table ...");
+		accountingdb.accountingdb.run("CREATE TABLE IF NOT EXISTS BalanceTypeCodes   (id                          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \
+                                                                                              Code                        TEXT NOT NULL, \
+                                                                                              Description                 TEXT, \
+                                                                                              UNIQUE(id))");
+		console.log("initdb: Table 'BalanceTypeCodes' created!");
+		console.log("initdb: Adding records in table 'BalanceTypeCodes' ...");
+		accountingdb.accountingdb.run("INSERT INTO BalanceTypeCodes (Code,          Description) \
+                                                      VALUES                ('OPBD',        'Opening Booked'), \
+                                                                            ('CLBD',        'Closing Booked'), \
+                                                                            ('INFO',        'Information'), \
+                                                                            ('CLAV',        'Closing Available'), \
+                                                                            ('FWAV',        'Forward Available'), \
+                                                                            ('ITAV',        'Interim Available'), \
+                                                                            ('ITBD',        'Interim Booked'), \
+                                                                            ('Proprietary', '...'), \
+                                                                            ('INTM',        'Intermediate');");
+		console.log("initdb: Added 'BalanceTypeCodes' records in DB!");
+		/*
+		 * Table Entries
+		 */
+		console.log("initdb: Create 'Entries' table ...");
+		accountingdb.accountingdb.run("CREATE TABLE IF NOT EXISTS Entries    (id                          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \
+                                                                                      EntryRef                    TEXT, \
+                                                                                      Ammount                     REAL DEFAULT 0 NOT NULL, \
+		                                                                      CreditDebit                 TEXT DEFAULT 'credit' NOT NULL, \
+		                                                                      CurrencyId                  INTEGER NOT NULL, \
+		                                                                      ReversalIndicator           BOOLEAN DEFAULT 0 NOT NULL, \
+                                               		                              StatusCodeId                INTEGER NOT NULL, \
+                                               		                              BookingDateTime             TEXT DEFAULT 0 NOT NULL, \
+                                               		                              ValueDateTime               TEXT DEFAULT 0 NOT NULL, \
+                                               		                              FOREIGN KEY (CurrencyId)    REFERENCES Currencies (id), \
+                                               		                              FOREIGN KEY (StatusCodeId)  REFERENCES StatusCodes (id), \
+                                               		                              UNIQUE(id))");
+		console.log("initdb: Table 'Entries' created!");
+		/*
+		 * Table StatusCodes
+		 */
+		console.log("initdb: Create 'StatusCodes' table ...");
+		accountingdb.accountingdb.run("CREATE TABLE IF NOT EXISTS StatusCodes(id                          INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \
+                                                                                      Code                        TEXT NOT NULL, \
+                                                                                      Description                 TEXT, \
+                                                                                      UNIQUE(id))");
+		console.log("initdb: Table 'StatusCodes' created!");
+		console.log("initdb: Adding records in table 'StatusCodes' ...");
+		accountingdb.accountingdb.run("INSERT INTO StatusCodes (Code,   Description) \
+                                                      VALUES           ('BOOK', 'Opening Booked'), \
+                                                                       ('PDNG', 'Closing Booked'), \
+                                                                       ('INFO', 'Information');");
+		console.log("initdb: Added 'StatusCodes' records in DB!");
+		/*
+		 * Accounts index
+		 */
+		console.log("initdb: Create 'Accounts' table index ...");
+		accountingdb.accountingdb.run('CREATE UNIQUE INDEX "AccountsIdx" ON "Accounts" ( \
+                                               "id", \
+                                               "Iban" \
+                                              );'
+		      );
+		console.log("initdb: 'Accounts' table index created!");
+		/*
+		 * StatementsAccountIdx index
+		 */
+		console.log("initdb: Create 'StatementsAccountsIdx' table index ...");
+		accountingdb.accountingdb.run('CREATE UNIQUE INDEX "StatementsAccountsIdx" ON "Statements" ( \
+                                               "id", \
+                                               "AccountId" \
+                                              );'
+		      );
+		console.log("initdb: 'StatementsAccountsIdx' table index created!");
+		/*
+		 * StatementsBalanceIdx index
+		 */
+		console.log("initdb: Create 'StatementsBalanceIdx' table index ...");
+		accountingdb.accountingdb.run('CREATE UNIQUE INDEX "StatementsBalanceIdx" ON "Statements" ( \
+                                               "id", \
+                                               "BalanceId" \
+                                              );'
+		      );
+		console.log("initdb: 'StatementsBalanceIdx' table index created!");
+		/*
+		 * EntriesCreditDebitIdx index
+		 */
+		console.log("initdb: Create 'EntriesCreditDebitIdx' table index ...");
+		accountingdb.accountingdb.run('CREATE UNIQUE INDEX "EntriesCreditDebitIdx" ON "Entries" ( \
+                                               "id", \
+                                               "CreditDebit" \
+                                              );'
+		      );
+		console.log("initdb: 'EntriesCreditDebitIdx' table index created!");
+		/*
+		 * EntriesBookingDateTimeIdx index
+		 */
+		console.log("initdb: Create 'EntriesBookingDateTimeIdx' table index ...");
+		accountingdb.accountingdb.run('CREATE UNIQUE INDEX "EntriesBookingDateTimeIdx" ON "Entries" ( \
+                                "id", \
+                                "BookingDateTime" \
+                        );'
+		      );
+		console.log("initdb: 'EntriesBookingDateTimeIdx' table index created!");
+		/*
+		 * EntriesValueDateTimeIdx index
+		 */
+		console.log("initdb: Create 'EntriesValueDateTimeIdx' table index ...");
+		accountingdb.accountingdb.run('CREATE UNIQUE INDEX "EntriesValueDateTimeIdx" ON "Entries" ( \
+                                "id", \
+                                "ValueDateTime" \
+                        );'
+		      );
+		console.log("initdb: 'EntriesValueDateTimeIdx' table index created!");
+		/*
+		 * COMMIT
+		 */
+		accountingdb.accountingdb.run("COMMIT;");
+	    }
+	);
+    });
+}
+
+function doDumpDB() {
+    fs.unlink("accountingdb.sql", (err) => {});
+    exec("sqlite3 -batch -init dump.sql "+sqlitedb_filepath+" .quit",
+	 (error, stdout, stderr) => {
+	     if (error) {
+		 console.log('error: '+error.message);
+		 return;
+	     }
+	     if (stderr) {
+		 console.log('stderr: '+stderr);
+		 return;
+	     }
+	     console.log('stdout: '+stdout);
+	     console.log('dumpdb: Database dumped into accountingdb.sql!');
+	     exec("dos2unix accountingdb.sql", (error, stdout, stderr) => {
+		 if (error) {
+		     console.log('error: '+error.message);
+		     return;
+		 }
+		 if (stderr)
+		     console.log(stderr);
+		 else
+		     console.log(stdout);
+		 exec("cat accountingdb.sql", (error, stdout, stderr) => {
+		     if (error) {
+			 console.log('error: '+error.message);
+			 return;
+		     }
+		     if (stderr) {
+			 console.log('stderr: '+stderr);
+			 return;
+		     }
+		     console.log('=========================================================================================================');
+		     console.log(stdout);
+		     console.log('=========================================================================================================');
+		 });
+	     });
+	 }
+	);
+}
+
+function doRestoreDB() {
+    /* Delete the file */
+    console.log('Deleting DB file '+sqlitedb_filepath+' ...');
+    fs.unlink(sqlitedb_filepath, (err) => {
+	if (err && (err.code != 'ENOENT' || err.errno != -4058))
+	    throw err;
+	else if (err && err.code == 'ENOENT' && err.errno == -4058)
+	    console.log('Delete DB file: no such file or directory: done!');
+	else
+	    console.log('Delete DB file: done!');
+
+	exec("sqlite3 -batch -init accountingdb.sql "+sqlitedb_filepath+" .quit",
+	     (error, stdout, stderr) => {
+		 if (error) {
+		     console.log('error: '+error.message);
+		     return;
+		 }
+		 if (stderr) {
+		     console.log('stderr: '+stderr);
+		     return;
+		 }
+		 console.log('stdout: '+stdout);
+		 fs.unlink("accountingdb.sql", (err) => {});
+	     });
+    });
+}
+
+/**
+ * Delete SQLite DB File
+ */
+
+console.log('initdb: argc = '+process.argv.length+' ...');
+let argc = 0;
+process.argv.forEach(element => console.log('initdb: argv['+(argc)+'] = '+process.argv[(argc++)]+' ...'));
+
+/* SQLite DB file path */
+var sqlitedb_filepath = process.env.HOME + '\\AppData\\Local\\rapr\\accounting.db';
+argc = 0;
+var flags = new Object;
+flags = {
+    initDbFlag: 0,
+    dumpDbFlag: 0,
+    restoreDbFlag: 0,
+    /* persistAccount */
+    persistAccountFlag: 0,
+    ibanFlag: 0,
+    iban: '',
+    bankIdFlag: 0,
+    bankId: 0,
+    currencyIdFlag: 0,
+    currencyId: 0,
+
+    /* persistCurrency */
+    persistCurrencyFlag: 0,
+    longNameFlag: 0,
+    longName: '',
+    symbolFlag: 0,
+    symbol: '',
+    codeFlag: 0,
+    code: '',
+
+    /* persistBank */
+    persistBankFlag: 0,
+    // LongNameFlag: 0,
+    // longName: 0,
+    // codeFlag: 0,
+    // code: 0,
+    bicFlag: 0,
+    bic: '',
+
+    /* persistStatement */
+    persistStatementFlag: 0,
+    electronicSeqNrFlag: 0,
+    creationDateTimeFlag: 0,
+    accountIdFlag: 0,
+    balanceIdFlag: 0,
+    
+    /* persistBalance */
+    persistBalanceFlag: 0,
+    typeCodeIdFlag: 0,
+    typeCodeId: 0,
+    proprietaryTypeFlag: 0,
+    proprietaryType: 0,
+    subTypeCodeIdFlag: 0,
+    subTypeCodeId: 0,
+    ammountFlag: 0,
+    ammount: 0,
+    creditDebitFlag: 0,
+    creditDebit: '',
+    dateTimeFlag: 0,
+    dateTime: '',
+    numberOfEntriesFlag: 0,
+    numberOfEntries: 0,
+    sumOfEntriesFlag: 0,
+    sumOfEntries: 0,
+    
+    /* persistBalanceTypeCode */
+    persistBalanceTypeCodeFlag: 0,
+    // codeFlag: 0,
+    descriptionFlag: 0,
+    description: '',
+
+    /* persistEntry */
+    persistEntryFlag: 0,
+    entryRefFlag: 0,
+    // ammountFlag: 0,
+    // creditDebitFlag: 0,
+    // currencyIdFlag: 0,
+    reversalIndicatorFlag: 0,
+    statusCodeIdFlag: 0,
+    bookingDateTimeFlag: 0,
+    valueDateTime: 0,
+    
+    /* persistStatusCode */
+    persistStatusCodeFlag: 0,
+    // codeFlag: 0,
+    // descriptionFlag: 0
+
+    accountByIbanFlag: 0
+};
+
+var commandFlag = '';
+for (let i = 2; i < process.argv.length; i++) {
+    if (process.argv[i] === "--init-db") {
+	flags.initDbFlag++;
+	console.log("[accountingdb] --init-db");
+	doInitDB();
+    }
+    else if (process.argv[i] === "--dump-db") {
+	flags.dumpDbFlag++;
+	console.log("[accountingdb] --dump-db");
+	doDumpDB();
+    }
+    else if (process.argv[i] === "--restore-db") {
+	flags.restoreDbFlag++;
+	console.log("[accountingdb] --restore-db");
+	dorestoreDB();
+    }
+    else if (process.argv[i] === "--persist-account") {
+	commandFlag = "--persist-account";
+	console.log("[accountingdb] --persist-account");
+	flags.persistAccountFlag++;
+    }
+    else if (process.argv[i] === "--iban") {
+	flags.ibanFlag++;
+	i++;
+	flags.iban = process.argv[i];
+	console.log("[accountingdb] --persist-account --iban "+flags.iban);
+    }
+    else if (process.argv[i] === "--bankId") {
+	flags['bankIdFlag']++;
+	i++
+	flags['bankId'] = process.argv[i];
+	console.log("[accountingdb] --persist-account --bankId "+flags['bankId']);
+    }
+    else if (process.argv[i] === "--currencyId") {
+	flags['currencyIdFlag']++;
+	i++;
+	flags['currencyId'] = process.argv[i];
+	console.log("[accountingdb] --persist-account --currencyId "+flags['currencyId']);
+    }
+    else if (process.argv[i] === "--persist-currency") {
+	commandFlag = "--persist-currency";
+	flags['persistCurrencyFlag']++;
+	console.log("[accountingdb] --persist-currency flag = "+flags['persistCurrencyFlag']);
+    }
+    else if (process.argv[i] === "--longName") {
+	flags['longNameFlag']++;
+	i++;
+	flags['longName'] = process.argv[i];
+	console.log("[accountingdb] --persist-currency --longName "+flags['longName']);
+    }
+    else if (process.argv[i] === "--symbol") {
+	flags['symbolFlag']++;
+	i++;
+	flags['symbol'] = process.argv[i];
+	console.log("[accountingdb] --persist-currency --symbol "+flags['symbol']);
+    }
+    else if (process.argv[i] === "--code") {
+	flags['codeFlag']++;
+	i++;
+	flags['code'] = process.argv[i];
+	console.log("[accountingdb] --persist-currency --code "+flags['code']);
+    }
+    else if (process.argv[i] === "--persist-bank") {
+	commandFlag = "--persist-bank";
+	console.log("[accountingdb] --persist-bank");
+	flags['persistBankFlag']++;
+    }
+    else if (process.argv[i] === "--bic") {
+	flags['bicFlag']++;
+	i++;
+	flags['bic'] = process.argv[i];
+	console.log("[accountingdb] --persist-bank --bic "+flags['bic']);
+    }
+    else if (process.argv[i] === "--persist-statement") {
+	commandFlag = "--persist-statement";
+	console.log("[accountingdb] --persist-statement");
+	flags['persistStatementFlag']++;
+    }
+    else if (process.argv[i] === "--electronicSeqNr") {
+	flags['electronicSeqNrFlag']++;
+	i++;
+	flags['electronicSeqNr'] = process.argv[i];
+	console.log("[accountingdb] --persist-statement -- "+flags['electronicSeqNr']);
+    }
+    else if (process.argv[i] === "--creationDateTime") {
+	flags['creationDateTimeFlag']++;
+	i++;
+	flags['creationDateTime'] = process.argv[i];
+	console.log("[accountingdb] --persist-statement --creationDateTime "+flags['creationDateTime']);
+    }
+    else if (process.argv[i] === "--accountId") {
+	flags['accountIdFlag']++;
+	i++;
+	flags['accountId'] = process.argv[i];
+	console.log("[accountingdb] --persist-statement --accountId "+flags['accountId']);
+    }
+    else if (process.argv[i] === "--balanceId") {
+	flags['balanceIdFlag']++;
+	i++;
+	flags['balanceId'] = process.argv[i];
+	console.log("[accountingdb] --persist-statement --balanceId "+flags['balanceId']);
+    }
+    else if (process.argv[i] === "--persist-balance") {
+	console.log("[accountingdb] --persist-balance");
+	flags['persistBalanceFlag']++;
+    }
+    else if (process.argv[i] === "--typeCodeId") {
+	flags['typeCodeIdFlag']++;
+	i++;
+	flags['typeCodeId'] = process.argv[i];
+	console.log("[accountingdb] --persist-balance --typeCodeId "+flags['typeCodeId']);
+    }
+    else if (process.argv[i] === "--proprietaryType") {
+	flags['proprietaryTypeFlag']++;
+	i++;
+	flags['proprietaryType'] = process.argv[i];
+	console.log("[accountingdb] --persist-balance --proprietaryType "+flags['proprietaryType']);
+    }
+    else if (process.argv[i] === "--subTypeCodeId") {
+	flags['subTypeCodeIdFlag']++;
+	i++;
+	flags['subTypeCodeId'] = process.argv[i];
+	console.log("[accountingdb] --persist-balance --subTypeCodeId "+flags['subTypeCodeId']);
+    }
+    else if (process.argv[i] === "--ammount") {
+	flags['ammountFlag']++;
+	i++;
+	flags['ammount'] = process.argv[i];
+	console.log("[accountingdb] --persist-balance --ammount "+flags['ammount']);
+    }
+    else if (process.argv[i] === "--creditDebit") {
+	flags['creditDebitFlag']++;
+	i++;
+	flags['creditDebit'] = process.argv[i];
+	console.log("[accountingdb] --persist-balance --creditDebit "+flags['creditDebit']);
+    }
+    else if (process.argv[i] === "--dateTime") {
+	flags['dateTimeFlag']++;
+	i++;
+	flags['dateTime'] = process.argv[i];
+	console.log("[accountingdb] --persist-balance --dateTime "+flags['dateTime']);
+    }
+    else if (process.argv[i] === "--numberOfEntries") {
+	flags['numberOfEntriesFlag']++;
+	i++;
+	flags['numberOfEntries'] = process.argv[i];
+	console.log("[accountingdb] --persist-balance --numberOfEntries "+flags['numberOfEntries']);
+    }
+    else if (process.argv[i] === "--sumOfEntries") {
+	flags['sumOfEntriesFlag']++;
+	i++;
+	flags['sumOfEntries'] = process.argv[i];
+	console.log("[accountingdb] --persist-balance --sumOfEntries "+flags['sumOfEntries']);
+    }
+    else if (process.argv[i] === "--account-by-iban") {
+	flags.accountByIbanFlag++;
+	console.log("[accountingdb] --account-by-iban");
+    }
+    else if (process.argv[i] === "--persist-balance-type-code") {
+	console.log("[accountingdb] --persist-balance-type-code");
+	flags['persistBalanceTypeCodeFlag']++;
+    }
+    else if (process.argv[i] === "--persist-entry") {
+	console.log("[accountingdb] --persist-entry");
+	flags['persistEntryFlag']++;
+    }
+    else if (process.argv[i] === "--persist-status-code") {
+	console.log("[accountingdb] --persist-status-code");
+	flags['persistStatusCodeFlag']++;
+    }
+    else {
+	console.log('accountingdb: invalid arg: process.argv['+i+'] = '+process.argv[i]+' ...');
+    }
+
+    console.log("accountByIban = "+flags.accountByIbanFlag);
+    console.log("iban = "+flags.ibanFlag);
+    if (flags['persistAccountFlag'] && flags['ibanFlag'] && flags['bankIdFlag'] && flags['currencyIdFlag']) {
+	console.log("[accountingdb] --persist-account");
+	flags['persistAccountFlag']--;
+	accountingdb.params['iban'] = flags['iban'];
+	flags.ibanFlag--;
+	accountingdb.params['bankId'] = flags['bankId'];
+	flags.bankIdFlag--;
+	accountingdb.params['currencyId'] = flags['currencyId'];
+	flags.currencyIdFlag--;
+	console.log("[accountingdb] --persist-account --iban "+accountingdb.params['iban']+
+		    " --bankId "+accountingdb.params['bankdId']+
+		    " --currencyId "+accountingdb.params['currencyId']);
+	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistAccount())}, 20)});
+	openPromise.then(persistPromise);
+    }
+    else if (flags['persistCurrencyFlag'] && flags['longNameFlag'] && flags['symbolFlag'] && flags['codeFlag']) {
+	console.log("[accountingdb] --persist-currency");
+	flags['persistCurrencyFlag']--;
+	accountingdb.params['longName'] = flags['longName'];
+	flags['longNameFlag']--;
+	accountingdb.params['symbol'] = flags['symbol'];
+	flags['symbolFlag']--;
+	accountingdb.params['code'] = flags['code'];
+	flags['codeFlag']--;
+	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistCurrency())}, 20)});
+	openPromise.then(persistPromise);	
+    }
+    else if (flags['persistBankFlag'] && flags['longNameFlag'] && flags['codeFlag'] && flags['bicFlag']) {
+	console.log("[accountingdb] --persist-bank");
+	flags['persistBankFlag']--;
+	accountingdb.params['longName'] = flags['longName'];
+	flags['longNameFlag']--;
+	accountingdb.params['code'] = flags['code'];
+	flags['codeFlag']--;
+	accountingdb.params['bic'] = flags['bic'];
+	flags['bicFlag']--;
+	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistBank())}, 20)});
+	openPromise.then(persistPromise);	
+    }
+    else if (flags['persistStatementFlag'] && flags['electronicSeqNrFlag'] &&
+	     flags['creationDateTimeFlag'] && flags['accountIdFlag'] && flags['balanceIdFlag']) {
+	console.log("[accountingdb] --persist-statement");
+	flags['persistStatementFlag']--;
+	accountingdb.params['electronicSeqNr'] = flags['electronicSeqNr'];
+	flags['electronicSeqNrFlag']--;
+	accountingdb.params['creationDateTime'] = flags['creationDateTime'];
+	flags['creationDateTimeFlag']--;
+	accountingdb.params['accountId'] = flags['accountId'];
+	flags['accountIdFlag']--;
+	accountingdb.params['balanceId'] = flags['balanceId'];
+	flags['balanceIdFlag']--;
+	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistStatement())}, 20)});
+	openPromise.then(persistPromise);	
+    }
+    else if (flags['persistBalanceFlag'] && flags['typeCodeIdFlag'] &&
+	     flags['proprietaryTypeFlag'] && flags['subTypeCodeIdFlag'] &&
+	     flags['ammountFlag'] && flags['creditDebitFlag'] && flags['numberOfEntries'] && flags['sumOfEntries']) {
+	console.log("[accountingdb] --persist-balance");
+	flags['persistBalanceFlag']--;
+	accountingdb.params['typeCodeId'] = flags['typeCodeId'];
+	flags['typeCodeIdFlag']--;
+	accountingdb.params['proprietaryType'] = flags['proprietaryType'];
+	flags['proprietaryTypeFlag']--;
+	accountingdb.params['subTypeCodeId'] = flags['subTypeCodeId'];
+	flags['subTypeCodeIdFlag']--;
+	accountingdb.params['ammount'] = flags['ammount'];
+	flags['ammountFlag']--;
+	accountingdb.params['creditDebit'] = flags['creditDebit'];
+	flags['creditDebitFlag']--;
+	if (flags['dateTimeFlag'] > 0) {
+	    accountingdb.params['dateTime'] = flags['dateTime'];
+	    flags['dateTimeFlag']--;
+	}
+	else
+	    accountingdb.params['dateTime'] = '0';
+	accountingdb.params['numberOfEntries'] = flags['numberOfEntries'];
+	flags['numberOfEntriesFlag']--;
+	accountingdb.params['sumOfEntries'] = flags['sumOfEntries'];
+	flags['sumOfEntriesFlag']--;
+	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistBalance())}, 20)});
+	openPromise.then(persistPromise);	
+    }
+    else if (flags.accountByIbanFlag && flags.ibanFlag) {
+	accountingdb.params.iban = flags.iban;
+	let account;
+	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+	const queryPromise = new Promise((resolve, reject) => {setTimeout(() => {
+	    resolve(accountingdb.getAccountByIban());
+	}, 220)});
+	openPromise.then(queryPromise);
+    }
+    console.log("***>===============================<***");
+}
