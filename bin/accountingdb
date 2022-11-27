@@ -29,17 +29,53 @@ var rp = require('request-promise');
 function printHelp() {
     console.log("accountingdb: Usage: accountingdb [OPTIONS] [COMMAND] [ARGUMENTS]");
     console.log("                     OPTIONS:");
-    console.log("                              -v|--verbose             be more verbose when running");
-    console.log("                              -h|--help                display this help message");
+    console.log("                              -v|--verbose             be more verbose when running.");
+    console.log("                              -h|--help                display this help message.");
     console.log("                     COMMAND:");
+    console.log("                              -I|--init-db             create and initialize database file.");
+    console.log("                              -D|--dump-db             dump database file to 'accountingdb.sql'.");
+    console.log("                              -R|--restore-db          restore database from 'accountingdb.sql' SQL file.");
+    console.log("                              ");
+    console.log("                              -A|--persist-account     create an Account persistent object in database.");
+    console.log("                              -C|--persist-currency    create an  persistent object in database.");
+    console.log("                              -B|--persist-bank        create an  persistent object in database.");
+    console.log("                              -S|--persist-statement   create an  persistent object in database.");
+    console.log("                              -L|--persist-balance     create an  persistent object in database.");
+    console.log("                              -T|--persist-balance-type-code");
+    console.log("                                                       create an  persistent object in database.");
+    console.log("                              -E|--persist-entry       create an  persistent object in database.");
+    console.log("                              -K|--persist-status-code create an  persistent object in database.");
     console.log("                              ");
     console.log("                              ");
-    console.log("                              ");
+    console.log("                              -a|--account-by-iban     read an Account persistent object from DB with Iban");
+    console.log("                              -c|--currency-by-code    read a Currency persistent object from DB with Code");
+    console.log("                              -s|--currency-by-symbol  read a Currency persistent object from DB with Symbol");
+    console.log("                              -b|--bank-by-bic         read a Bank persistent object from DB with BIC");
+    console.log("                              -t|--statement-by-seqnum read a Statement persistent object from DB with ElectronicSeqNumber");
     console.log("                              ");
     console.log("                     ARGUMENTS:");
+    console.log("                              --id                     provide a persistent object 'id' value");
+    console.log("                              --iban                   provide a persistent object 'Iban' value");
+    console.log("                              --bankId                 provide a persistent object 'BankId' value");
+    console.log("                              --currencyId             provide a persistent object 'CurrencyId' value");
+    console.log("                              --longName               provide a persistent object 'LongName' value");
+    console.log("                              --symbol                 provide a persistent object 'Symbol' value");
+    console.log("                              --code                   provide a persistent object 'Code' value");
+    console.log("                              --bic                    provide a persistent object 'BIC' value");
+    console.log("                              --electronicSeqNr        provide a persistent object 'ElectronicSeqNr' value");
+    console.log("                              --creationDateTime       provide a persistent object 'CreationDateTime' value");
+    console.log("                              --accountId              provide a persistent object 'AccountId' value");
+    console.log("                              --balanceId              provide a persistent object 'BalanceId' value");
+    console.log("                              --typeCodeId             provide a persistent object 'TypeCodeId' value");
+    console.log("                              --proprietaryType        provide a persistent object 'ProprietaryType' value");
+    console.log("                              --subTypeCodeId          provide a persistent object 'SubTypeCodeId' value");
+    console.log("                              --ammount                provide a persistent object 'Ammount' value");
+    console.log("                              --creditDebit            provide a persistent object 'CreditDebit' value");
+    console.log("                              --dateTime               provide a persistent object 'DateTime' value");
+    console.log("                              --numberOfEntries        provide a persistent object 'NumberOfEntries' value");
+    console.log("                              --sumOfEntries           provide a persistent object 'SumOfEntries' value");
     console.log("                              ");
-    console.log("                              ");
-    console.log("                              ");
+    console.log("              Copyright © 2022 Rémi COHEN SCALI");
 }
 function doInitDB() {
     /* Delete the file */
@@ -491,9 +527,9 @@ for (let i = 2; i < process.argv.length; i++) {
     }
 
     /**
-     * --init-db
+     * --init-db | -I
      */
-    if (process.argv[i] === "--init-db") {
+    if (process.argv[i] === "--init-db" || process.argv[i] === "-I") {
         flags.initDbFlag++;
         commandString = '--init-db';
         console.log("[accountingdb] %s", commandString);
@@ -501,9 +537,9 @@ for (let i = 2; i < process.argv.length; i++) {
     }
 
     /**
-     * --dump-db
+     * --dump-db | -D
      */
-    else if (process.argv[i] === "--dump-db") {
+    else if (process.argv[i] === "--dump-db" || process.argv[i] === "-D") {
         flags.dumpDbFlag++;
         commandString = '--dump-db';
         console.log("[accountingdb] %s", commandString);
@@ -511,9 +547,9 @@ for (let i = 2; i < process.argv.length; i++) {
     }
 
     /**
-     * --restore-db
+     * --restore-db | -R
      */
-    else if (process.argv[i] === "--restore-db") {
+    else if (process.argv[i] === "--restore-db" || process.argv[i] === "-R") {
         flags.restoreDbFlag++;
         commandString = "--restore-db";
         console.log("[accountingdb] %s", commandString);
@@ -528,9 +564,9 @@ for (let i = 2; i < process.argv.length; i++) {
     }
 
     /**
-     * --persist-account
+     * --persist-account | -A
      */
-    else if (process.argv[i] === "--persist-account") {
+    else if (process.argv[i] === "--persist-account" || process.argv[i] === "-A") {
         commandString = "--persist-account";
         console.log("[accountingdb] %s", commandString);
         flags.persistAccountFlag++;
@@ -558,9 +594,9 @@ for (let i = 2; i < process.argv.length; i++) {
     }
 
     /**
-     * --persist-currency
+     * --persist-currency | -C
      */
-    else if (process.argv[i] === "--persist-currency") {
+    else if (process.argv[i] === "--persist-currency" || process.argv[i] === "-C") {
         commandString = "--persist-currency";
         flags.persistCurrencyFlag++;
         console.log("[accountingdb] %s", commandString);
@@ -588,9 +624,9 @@ for (let i = 2; i < process.argv.length; i++) {
     }
 
     /**
-     * --persist-bank
+     * --persist-bank | -B
      */
-    else if (process.argv[i] === "--persist-bank") {
+    else if (process.argv[i] === "--persist-bank" || process.argv[i] === "-B") {
         commandString = "--persist-bank";
         console.log("[accountingdb] %s", commandString);
         flags.persistBankFlag++;
@@ -604,9 +640,9 @@ for (let i = 2; i < process.argv.length; i++) {
     }
 
     /**
-     * --persist-statement
+     * --persist-statement | -S
      */
-    else if (process.argv[i] === "--persist-statement") {
+    else if (process.argv[i] === "--persist-statement" || process.argv[i] === "-S") {
         commandString = "--persist-statement";
         flags.persistStatementFlag++;
         console.log("[accountingdb] %s", commandString);
@@ -641,9 +677,9 @@ for (let i = 2; i < process.argv.length; i++) {
     }
 
     /**
-     * --persist-balance
+     * --persist-balance | -L
      */
-    else if (process.argv[i] === "--persist-balance") {
+    else if (process.argv[i] === "--persist-balance" || process.argv[i] === "-L") {
         commandString = "--persist-balance";
         flags.persistBalanceFlag++;
         console.log("[accountingdb] %s", commandString);
@@ -707,54 +743,54 @@ for (let i = 2; i < process.argv.length; i++) {
     }
 
     /**
-     * --account-by-iban
+     * --account-by-iban | -a
      */
-    else if (process.argv[i] === "--account-by-iban") {
+    else if (process.argv[i] === "--account-by-iban" || process.argv[i] === "-a") {
         commandString = "--account-by-iban";
         flags.accountByIbanFlag++;
         console.log("[accountingdb] %s", commandString);
     }
 
     /**
-     * --currency-by-code
+     * --currency-by-code | -c
      */
-    else if (process.argv[i] === "--currency-by-code") {
+    else if (process.argv[i] === "--currency-by-code" || process.argv[i] === "-c") {
         commandString = "--currency-by-code";
         flags.currencyByCodeFlag++;
         console.log("[accountingdb] %s", commandString);
     }
 
     /**
-     * --currency-by-symbol
+     * --currency-by-symbol | -s
      */
-    else if (process.argv[i] === "--currency-by-symbol") {
+    else if (process.argv[i] === "--currency-by-symbol" || process.argv[i] === "-s") {
         commandString = "--currency-by-symbol";
         flags.currencyBySymbolFlag++;
         console.log("[accountingdb] %s", commandString);
     }
 
     /**
-     * --persist-balance-type-code
+     * --persist-balance-type-code | -T
      */
-    else if (process.argv[i] === "--persist-balance-type-code") {
+    else if (process.argv[i] === "--persist-balance-type-code" || process.argv[i] === "-T") {
         commandString = "--persist-balance-type-code";
         console.log("[accountingdb] --persist-balance-type-code", commandString);
         flags.persistBalanceTypeCodeFlag++;
     }
 
     /**
-     * --persist-entry
+     * --persist-entry | -E
      */
-    else if (process.argv[i] === "--persist-entry") {
+    else if (process.argv[i] === "--persist-entry" || process.argv[i] === "-E") {
         commandString = "--persist-entry";
         console.log("[accountingdb] %s", commandString);
         flags.persistEntryFlag++;
     }
 
     /**
-     * --persist-status-code
+     * --persist-status-code | -K
      */
-    else if (process.argv[i] === "--persist-status-code") {
+    else if (process.argv[i] === "--persist-status-code" || process.argv[i] === "-K") {
         commandString = "--persist-status-code";
         console.log("[accountingdb] %s", commandString);
         flags.persistStatusCodeFlag++;
