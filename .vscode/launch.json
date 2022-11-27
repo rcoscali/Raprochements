@@ -15,7 +15,7 @@
             "args": ["--account-by-iban", "--iban", "FR76928836647839290734"]
         },
         {
-            "name": "Debug account-by-iban",
+            "name": "Debug missing arg account-by-iban",
             "program": "${workspaceFolder}/bin/accountingdb",
             "request": "launch",
             "skipFiles": [
