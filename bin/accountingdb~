@@ -10,6 +10,9 @@
  * ./bin/accountingdb --persist-bank --longName 'Crédit mutuel' --code CMU --bic CRMUFRPP
  * ./bin/accountingdb --persist-statement --electronicSeqNr 226 --creationDateTime '2022-09-08 21:30:43' --accountId 3 --balanceId 1
  * ./bin/accountingdb --persist-balance --typeCodeId 2 --proprietaryType HGDF --subTypeCodeId 3 --ammount 25432.76 --creditDebit 'credit' --dateTime '2022-09-08 21:30:43' --numberOfEntries 8 --sumOfEntries 2543.65
+ * ./bin/accountingdb --account-by-iban --iban FR76928836647839290734
+ * ./bin/accountingdb --currency-by-code --code EUR
+ * ./bin/accountingdb --currency-by-symbol --symbol $
  */
 
 // Use db.js app: openDb
@@ -318,7 +321,7 @@ function doRestoreDB() {
  * Delete SQLite DB File
  */
 
-console.log('initdb: argc = '+process.argv.length+' ...');
+console.log('accountingdb: argc = '+process.argv.length+' ...');
 let argc = 0;
 process.argv.forEach(element => console.log('initdb: argv['+(argc)+'] = '+process.argv[(argc++)]+' ...'));
 
@@ -326,10 +329,16 @@ process.argv.forEach(element => console.log('initdb: argv['+(argc)+'] = '+proces
 var sqlitedb_filepath = process.env.HOME + '\\AppData\\Local\\rapr\\accounting.db';
 argc = 0;
 var flags = new Object;
+var commandString  = '';
 flags = {
+    /* Init functions flags */
     initDbFlag: 0,
     dumpDbFlag: 0,
     restoreDbFlag: 0,
+
+    /* id flag for object id's */
+    idFlag: 0,
+    
     /* persistAccount */
     persistAccountFlag: 0,
     ibanFlag: 0,
@@ -338,6 +347,9 @@ flags = {
     bankId: 0,
     currencyIdFlag: 0,
     currencyId: 0,
+
+    /* deleteAccount */
+    deleteAccountFlag: 0,
 
     /* persistCurrency */
     persistCurrencyFlag: 0,
@@ -348,6 +360,9 @@ flags = {
     codeFlag: 0,
     code: '',
 
+    /* deleteCurrency */
+    deleteCurrencyFlag: 0,
+
     /* persistBank */
     persistBankFlag: 0,
     // LongNameFlag: 0,
@@ -357,6 +372,9 @@ flags = {
     bicFlag: 0,
     bic: '',
 
+    /* deleteBank */
+    deleteBankFlag: 0,
+
     /* persistStatement */
     persistStatementFlag: 0,
     electronicSeqNrFlag: 0,
@@ -364,6 +382,9 @@ flags = {
     accountIdFlag: 0,
     balanceIdFlag: 0,
     
+    /* deleteStatement */
+    deleteStatementFlag: 0,
+
     /* persistBalance */
     persistBalanceFlag: 0,
     typeCodeIdFlag: 0,
@@ -383,11 +404,17 @@ flags = {
     sumOfEntriesFlag: 0,
     sumOfEntries: 0,
     
+    /* deleteBalance */
+    deleteBalanceFlag: 0,
+
     /* persistBalanceTypeCode */
     persistBalanceTypeCodeFlag: 0,
     // codeFlag: 0,
     descriptionFlag: 0,
     description: '',
+
+    /* deleteBalanceTypeCode */
+    deleteBalanceTypeCodeFlag: 0,
 
     /* persistEntry */
     persistEntryFlag: 0,
@@ -400,286 +427,468 @@ flags = {
     bookingDateTimeFlag: 0,
     valueDateTime: 0,
     
+    /* deleteEntry */
+    deleteEntryFlag: 0,
+
     /* persistStatusCode */
     persistStatusCodeFlag: 0,
     // codeFlag: 0,
     // descriptionFlag: 0
 
-    accountByIbanFlag: 0
+    /* deleteStatusCode */
+    deleteStatusCodeFlag: 0,
+
+    /* getter options flags */
+    accountByIbanFlag: 0,
+    currencyByCodeFlag: 0,
+    currencyBySymbolFlag: 0,
+    bankByBicFlag: 0
 };
 
-var commandFlag = '';
+var commandString = '';
 for (let i = 2; i < process.argv.length; i++) {
+    
+    /**
+     * --init-db
+     */
     if (process.argv[i] === "--init-db") {
 	flags.initDbFlag++;
-	console.log("[accountingdb] --init-db");
+	commandString = '--init-db';
+	console.log("[accountingdb] %s", commandString);
 	doInitDB();
     }
+
+    /**
+     * --dump-db
+     */
     else if (process.argv[i] === "--dump-db") {
 	flags.dumpDbFlag++;
-	console.log("[accountingdb] --dump-db");
+	commandString = '--dump-db';
+	console.log("[accountingdb] %s", commandString);
 	doDumpDB();
     }
+
+    /**
+     * --restore-db
+     */
     else if (process.argv[i] === "--restore-db") {
 	flags.restoreDbFlag++;
-	console.log("[accountingdb] --restore-db");
+	commandString = "--restore-db";
+	console.log("[accountingdb] %s", commandString);
 	dorestoreDB();
     }
+    
+    /** --id */
+    else if (process.argv[i] === "--id") {
+	flags.idFlag++;
+	flags.id = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.id);
+    }
+
+    /**
+     * --persist-account
+     */
     else if (process.argv[i] === "--persist-account") {
-	commandFlag = "--persist-account";
-	console.log("[accountingdb] --persist-account");
+	commandString = "--persist-account";
+	console.log("[accountingdb] %s", commandString);
 	flags.persistAccountFlag++;
     }
+
+    /** --iban */
     else if (process.argv[i] === "--iban") {
 	flags.ibanFlag++;
-	i++;
 	flags.iban = process.argv[i];
-	console.log("[accountingdb] --persist-account --iban "+flags.iban);
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.iban);
     }
+
+    /** --bankId */
     else if (process.argv[i] === "--bankId") {
-	flags['bankIdFlag']++;
-	i++
-	flags['bankId'] = process.argv[i];
-	console.log("[accountingdb] --persist-account --bankId "+flags['bankId']);
+	flags.bankIdFlag++;
+	flags.bankId = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.bankId);
     }
+
+    /** --currencyId */
     else if (process.argv[i] === "--currencyId") {
-	flags['currencyIdFlag']++;
-	i++;
-	flags['currencyId'] = process.argv[i];
-	console.log("[accountingdb] --persist-account --currencyId "+flags['currencyId']);
+	flags.currencyIdFlag++;
+	flags.currencyId = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.currencyId);
     }
+
+    /**
+     * --persist-currency
+     */
     else if (process.argv[i] === "--persist-currency") {
-	commandFlag = "--persist-currency";
-	flags['persistCurrencyFlag']++;
-	console.log("[accountingdb] --persist-currency flag = "+flags['persistCurrencyFlag']);
+	commandString = "--persist-currency";
+	flags.persistCurrencyFlag++;
+	console.log("[accountingdb] %s", commandString);
     }
+
+    /** --longName */
     else if (process.argv[i] === "--longName") {
-	flags['longNameFlag']++;
-	i++;
-	flags['longName'] = process.argv[i];
-	console.log("[accountingdb] --persist-currency --longName "+flags['longName']);
+	flags.longNameFlag++;
+	flags.longName = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.longName);
     }
+
+    /** --symbol */
     else if (process.argv[i] === "--symbol") {
-	flags['symbolFlag']++;
-	i++;
-	flags['symbol'] = process.argv[i];
-	console.log("[accountingdb] --persist-currency --symbol "+flags['symbol']);
+	flags.symbolFlag++;
+	flags.symbol = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.symbol);
     }
+
+    /** --code */
     else if (process.argv[i] === "--code") {
-	flags['codeFlag']++;
-	i++;
-	flags['code'] = process.argv[i];
-	console.log("[accountingdb] --persist-currency --code "+flags['code']);
+	flags.codeFlag++;
+	flags.code = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.code);
     }
+
+    /**
+     * --persist-bank
+     */
     else if (process.argv[i] === "--persist-bank") {
-	commandFlag = "--persist-bank";
-	console.log("[accountingdb] --persist-bank");
-	flags['persistBankFlag']++;
+	commandString = "--persist-bank";
+	console.log("[accountingdb] %s", commandString);
+	flags.persistBankFlag++;
     }
+
+    /** --bic */
     else if (process.argv[i] === "--bic") {
-	flags['bicFlag']++;
-	i++;
-	flags['bic'] = process.argv[i];
-	console.log("[accountingdb] --persist-bank --bic "+flags['bic']);
+	flags.bicFlag++;
+	flags.bic = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.bic);
     }
+
+    /**
+     * --persist-statement
+     */
     else if (process.argv[i] === "--persist-statement") {
-	commandFlag = "--persist-statement";
-	console.log("[accountingdb] --persist-statement");
-	flags['persistStatementFlag']++;
+	commandString = "--persist-statement";
+	flags.persistStatementFlag++;
+	console.log("[accountingdb] %s", commandString);
     }
+
+    /** --electronicSeqNr */
     else if (process.argv[i] === "--electronicSeqNr") {
-	flags['electronicSeqNrFlag']++;
-	i++;
-	flags['electronicSeqNr'] = process.argv[i];
-	console.log("[accountingdb] --persist-statement -- "+flags['electronicSeqNr']);
+	flags.electronicSeqNrFlag++;
+	flags.electronicSeqNr = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.electronicSeqNr);
     }
+
+    /** --creationDateTime */
     else if (process.argv[i] === "--creationDateTime") {
-	flags['creationDateTimeFlag']++;
-	i++;
-	flags['creationDateTime'] = process.argv[i];
-	console.log("[accountingdb] --persist-statement --creationDateTime "+flags['creationDateTime']);
+	flags.creationDateTimeFlag++;
+	flags.creationDateTime = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.creationDateTime);
     }
+
+    /** --accountId */
     else if (process.argv[i] === "--accountId") {
-	flags['accountIdFlag']++;
-	i++;
-	flags['accountId'] = process.argv[i];
-	console.log("[accountingdb] --persist-statement --accountId "+flags['accountId']);
+	flags.accountIdFlag++;
+	flags.accountId = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.accountId);
     }
+
+    /** --balanceId */
     else if (process.argv[i] === "--balanceId") {
-	flags['balanceIdFlag']++;
-	i++;
-	flags['balanceId'] = process.argv[i];
-	console.log("[accountingdb] --persist-statement --balanceId "+flags['balanceId']);
+	flags.balanceIdFlag++;
+	flags.balanceId = process.argv[i];
+	console.log("[accountingdb] %s --balanceId "+flags.balanceId);
     }
+
+    /**
+     * --persist-balance
+     */
     else if (process.argv[i] === "--persist-balance") {
-	console.log("[accountingdb] --persist-balance");
-	flags['persistBalanceFlag']++;
+	commandString = "--persist-balance";
+	flags.persistBalanceFlag++;
+	console.log("[accountingdb] %s", commandString);
     }
+
+    /** --typeCodeId */
     else if (process.argv[i] === "--typeCodeId") {
-	flags['typeCodeIdFlag']++;
+	flags.typeCodeIdFlag++;
 	i++;
-	flags['typeCodeId'] = process.argv[i];
-	console.log("[accountingdb] --persist-balance --typeCodeId "+flags['typeCodeId']);
+	flags.typeCodeId = process.argv[i];
+	console.log("[accountingdb] %s --typeCodeId %s", process.argv[i++], commandString, flags.typeCodeId);
     }
+
+    /** --proprietaryType */
     else if (process.argv[i] === "--proprietaryType") {
-	flags['proprietaryTypeFlag']++;
-	i++;
-	flags['proprietaryType'] = process.argv[i];
-	console.log("[accountingdb] --persist-balance --proprietaryType "+flags['proprietaryType']);
+	flags.proprietaryTypeFlag++;
+	flags.proprietaryType = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.proprietaryType);
     }
+
+    /** --subTypeCodeId */
     else if (process.argv[i] === "--subTypeCodeId") {
-	flags['subTypeCodeIdFlag']++;
-	i++;
-	flags['subTypeCodeId'] = process.argv[i];
-	console.log("[accountingdb] --persist-balance --subTypeCodeId "+flags['subTypeCodeId']);
+	flags.subTypeCodeIdFlag++;
+	flags.subTypeCodeId = process.argv[i];
+	console.log("[accountingdb] %s %s ", commandString, process.argv[i++], flags.subTypeCodeId);
     }
+
+    /** --ammount */
     else if (process.argv[i] === "--ammount") {
-	flags['ammountFlag']++;
-	i++;
-	flags['ammount'] = process.argv[i];
-	console.log("[accountingdb] --persist-balance --ammount "+flags['ammount']);
+	flags.ammountFlag++;
+	flags.ammount = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.ammount);
     }
+
+    /** --creditDebit */
     else if (process.argv[i] === "--creditDebit") {
-	flags['creditDebitFlag']++;
-	i++;
-	flags['creditDebit'] = process.argv[i];
-	console.log("[accountingdb] --persist-balance --creditDebit "+flags['creditDebit']);
+	flags.creditDebitFlag++;
+	flags.creditDebit = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.creditDebit);
     }
+
+    /** --dateTime */
     else if (process.argv[i] === "--dateTime") {
-	flags['dateTimeFlag']++;
-	i++;
-	flags['dateTime'] = process.argv[i];
-	console.log("[accountingdb] --persist-balance --dateTime "+flags['dateTime']);
+	flags.dateTimeFlag++;
+	flags.dateTime = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.dateTime);
     }
+
+    /** --numberOfEntries */
     else if (process.argv[i] === "--numberOfEntries") {
-	flags['numberOfEntriesFlag']++;
-	i++;
-	flags['numberOfEntries'] = process.argv[i];
-	console.log("[accountingdb] --persist-balance --numberOfEntries "+flags['numberOfEntries']);
+	flags.numberOfEntriesFlag++;
+	flags.numberOfEntries = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.numberOfEntries);
     }
+
+    /** --sumOfEntries */
     else if (process.argv[i] === "--sumOfEntries") {
-	flags['sumOfEntriesFlag']++;
-	i++;
-	flags['sumOfEntries'] = process.argv[i];
-	console.log("[accountingdb] --persist-balance --sumOfEntries "+flags['sumOfEntries']);
+	flags.sumOfEntriesFlag++;
+	flags.sumOfEntries = process.argv[i];
+	console.log("[accountingdb] %s %s %s", commandString, process.argv[i++], flags.sumOfEntries);
     }
+
+    /**
+     * --account-by-iban
+     */
     else if (process.argv[i] === "--account-by-iban") {
+	commandString = "--account-by-iban";
 	flags.accountByIbanFlag++;
-	console.log("[accountingdb] --account-by-iban");
+	console.log("[accountingdb] %s", commandString);
     }
+
+    /**
+     * --currency-by-code
+     */
+    else if (process.argv[i] === "--currency-by-code") {
+	commandString = "--currency-by-code";
+	flags.currencyByCodeFlag++;
+	console.log("[accountingdb] %s", commandString);
+    }
+
+    /**
+     * --currency-by-symbol
+     */
+    else if (process.argv[i] === "--currency-by-symbol") {
+	commandString = "--currency-by-symbol";
+	flags.currencyBySymbolFlag++;
+	console.log("[accountingdb] %s", commandString);
+    }
+
+    /**
+     * --persist-balance-type-code
+     */
     else if (process.argv[i] === "--persist-balance-type-code") {
-	console.log("[accountingdb] --persist-balance-type-code");
-	flags['persistBalanceTypeCodeFlag']++;
+	commandString = "--persist-balance-type-code";
+	console.log("[accountingdb] --persist-balance-type-code", commandString);
+	flags.persistBalanceTypeCodeFlag++;
     }
+
+    /**
+     * --persist-entry
+     */
     else if (process.argv[i] === "--persist-entry") {
-	console.log("[accountingdb] --persist-entry");
-	flags['persistEntryFlag']++;
+	commandString = "--persist-entry";
+	console.log("[accountingdb] %s", commandString);
+	flags.persistEntryFlag++;
     }
+
+    /**
+     * --persist-status-code
+     */
     else if (process.argv[i] === "--persist-status-code") {
-	console.log("[accountingdb] --persist-status-code");
-	flags['persistStatusCodeFlag']++;
+	commandString = "--persist-status-code";
+	console.log("[accountingdb] %s", commandString);
+	flags.persistStatusCodeFlag++;
     }
+
+    /**
+     * Errors
+     */
     else {
 	console.log('accountingdb: invalid arg: process.argv['+i+'] = '+process.argv[i]+' ...');
     }
-
-    console.log("accountByIban = "+flags.accountByIbanFlag);
-    console.log("iban = "+flags.ibanFlag);
-    if (flags['persistAccountFlag'] && flags['ibanFlag'] && flags['bankIdFlag'] && flags['currencyIdFlag']) {
-	console.log("[accountingdb] --persist-account");
-	flags['persistAccountFlag']--;
-	accountingdb.params['iban'] = flags['iban'];
-	flags.ibanFlag--;
-	accountingdb.params['bankId'] = flags['bankId'];
-	flags.bankIdFlag--;
-	accountingdb.params['currencyId'] = flags['currencyId'];
-	flags.currencyIdFlag--;
-	console.log("[accountingdb] --persist-account --iban "+accountingdb.params['iban']+
-		    " --bankId "+accountingdb.params['bankdId']+
-		    " --currencyId "+accountingdb.params['currencyId']);
-	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
-	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistAccount())}, 20)});
-	openPromise.then(persistPromise);
-    }
-    else if (flags['persistCurrencyFlag'] && flags['longNameFlag'] && flags['symbolFlag'] && flags['codeFlag']) {
-	console.log("[accountingdb] --persist-currency");
-	flags['persistCurrencyFlag']--;
-	accountingdb.params['longName'] = flags['longName'];
-	flags['longNameFlag']--;
-	accountingdb.params['symbol'] = flags['symbol'];
-	flags['symbolFlag']--;
-	accountingdb.params['code'] = flags['code'];
-	flags['codeFlag']--;
-	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
-	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistCurrency())}, 20)});
-	openPromise.then(persistPromise);	
-    }
-    else if (flags['persistBankFlag'] && flags['longNameFlag'] && flags['codeFlag'] && flags['bicFlag']) {
-	console.log("[accountingdb] --persist-bank");
-	flags['persistBankFlag']--;
-	accountingdb.params['longName'] = flags['longName'];
-	flags['longNameFlag']--;
-	accountingdb.params['code'] = flags['code'];
-	flags['codeFlag']--;
-	accountingdb.params['bic'] = flags['bic'];
-	flags['bicFlag']--;
-	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
-	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistBank())}, 20)});
-	openPromise.then(persistPromise);	
-    }
-    else if (flags['persistStatementFlag'] && flags['electronicSeqNrFlag'] &&
-	     flags['creationDateTimeFlag'] && flags['accountIdFlag'] && flags['balanceIdFlag']) {
-	console.log("[accountingdb] --persist-statement");
-	flags['persistStatementFlag']--;
-	accountingdb.params['electronicSeqNr'] = flags['electronicSeqNr'];
-	flags['electronicSeqNrFlag']--;
-	accountingdb.params['creationDateTime'] = flags['creationDateTime'];
-	flags['creationDateTimeFlag']--;
-	accountingdb.params['accountId'] = flags['accountId'];
-	flags['accountIdFlag']--;
-	accountingdb.params['balanceId'] = flags['balanceId'];
-	flags['balanceIdFlag']--;
-	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
-	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistStatement())}, 20)});
-	openPromise.then(persistPromise);	
-    }
-    else if (flags['persistBalanceFlag'] && flags['typeCodeIdFlag'] &&
-	     flags['proprietaryTypeFlag'] && flags['subTypeCodeIdFlag'] &&
-	     flags['ammountFlag'] && flags['creditDebitFlag'] && flags['numberOfEntries'] && flags['sumOfEntries']) {
-	console.log("[accountingdb] --persist-balance");
-	flags['persistBalanceFlag']--;
-	accountingdb.params['typeCodeId'] = flags['typeCodeId'];
-	flags['typeCodeIdFlag']--;
-	accountingdb.params['proprietaryType'] = flags['proprietaryType'];
-	flags['proprietaryTypeFlag']--;
-	accountingdb.params['subTypeCodeId'] = flags['subTypeCodeId'];
-	flags['subTypeCodeIdFlag']--;
-	accountingdb.params['ammount'] = flags['ammount'];
-	flags['ammountFlag']--;
-	accountingdb.params['creditDebit'] = flags['creditDebit'];
-	flags['creditDebitFlag']--;
-	if (flags['dateTimeFlag'] > 0) {
-	    accountingdb.params['dateTime'] = flags['dateTime'];
-	    flags['dateTimeFlag']--;
-	}
-	else
-	    accountingdb.params['dateTime'] = '0';
-	accountingdb.params['numberOfEntries'] = flags['numberOfEntries'];
-	flags['numberOfEntriesFlag']--;
-	accountingdb.params['sumOfEntries'] = flags['sumOfEntries'];
-	flags['sumOfEntriesFlag']--;
-	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
-	const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {resolve(accountingdb.persistBalance())}, 20)});
-	openPromise.then(persistPromise);	
-    }
-    else if (flags.accountByIbanFlag && flags.ibanFlag) {
-	accountingdb.params.iban = flags.iban;
-	let account;
-	var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
-	const queryPromise = new Promise((resolve, reject) => {setTimeout(() => {
-	    resolve(accountingdb.getAccountByIban());
-	}, 220)});
-	openPromise.then(queryPromise);
-    }
-    console.log("***>===============================<***");
 }
+
+
+console.log("*> [accountingdb] %s", commandString);
+/**
+ * Handle missing args errors
+ */
+if ((flags.persistAccountFlag && !(flags.ibanFlag && flags.bankIdFlag && flags.currencyIdFlag)) ||
+    (flags.persistCurrencyFlag && !(flags.longNameFlag && flags.symbolFlag && flags.codeFlag)) ||
+    (flags.persistBankFlag && !(flags.longNameFlag && flags.codeFlag && flags.bicFlag)) ||
+    (flags.deleteBank && !flags.idFlag) ||
+    (flags.persistStatementFlag && !(flags.electronicSeqNrFlag && flags.creationDateTimeFlag && flags.accountIdFlag && flags.balanceIdFlag)) ||
+    (flags.persistBalanceFlag && !(flags.typeCodeIdFlag && flags.proprietaryTypeFlag &&
+				   flags.subTypeCodeIdFlag && flags.ammountFlag &&
+				   flags.creditDebitFlag && flags.numberOfEntries &&
+				   flags.sumOfEntries)) ||
+    (flags.accountByIbanFlag && !flags.ibanFlag) ||
+    (flags.currencyByCodeFlag && !flags.codeFlag) ||
+    (flags.currencyBySymbolFlag && !flags.symbolFlag)
+   )
+{
+    console.error("[accountingdb] %s: Error: Missing argument!", commandString);
+    printHelp();
+    exit(1);
+}
+/**
+ * persistAccount
+ */
+else if (flags.persistAccountFlag && flags.ibanFlag && flags.bankIdFlag && flags.currencyIdFlag) {
+    flags.persistAccountFlag--;
+    accountingdb.params.iban = flags.iban;
+    flags.ibanFlag--;
+    accountingdb.params.bankId = flags.bankId;
+    flags.bankIdFlag--;
+    accountingdb.params.currencyId = flags.currencyId;
+    flags.currencyIdFlag--;
+    var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+    const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {
+	resolve(accountingdb.persistAccount());
+    }, 20)});
+    openPromise.then(persistPromise);
+}
+/**
+ * persistCurrency
+ */
+else if (flags.persistCurrencyFlag && flags.longNameFlag && flags.symbolFlag && flags.codeFlag) {
+    flags.persistCurrencyFlag--;
+    accountingdb.params.longName = flags.longName;
+    flags.longNameFlag--;
+    accountingdb.params.symbol = flags.symbol;
+    flags.symbolFlag--;
+    accountingdb.params.code = flags.code;
+    flags.codeFlag--;
+    var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+    const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {
+	resolve(accountingdb.persistCurrency());
+    }, 20)});
+    openPromise.then(persistPromise);	
+}
+/**
+ * persistBank
+ */
+else if (flags.persistBankFlag && flags.longNameFlag && flags.codeFlag && flags.bicFlag) {
+    flags.persistBankFlag--;
+    accountingdb.params.longName = flags.longName;
+    flags.longNameFlag--;
+    accountingdb.params.code = flags.code;
+    flags.codeFlag--;
+    accountingdb.params.bic = flags.bic;
+    flags.bicFlag--;
+    var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+    const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {
+	resolve(accountingdb.persistBank());
+    }, 20)});
+    openPromise.then(persistPromise);	
+}
+/**
+ * deleteCurrency
+ */
+else if (flags.deleteBank && flags.idFlag) {
+}
+/**
+ * persistStatement
+ */
+else if (flags.persistStatementFlag && flags.electronicSeqNrFlag &&
+	 flags.creationDateTimeFlag && flags.accountIdFlag && flags.balanceIdFlag) {
+    flags.persistStatementFlag--;
+    accountingdb.params.electronicSeqNr = flags.electronicSeqNr;
+    flags.electronicSeqNrFlag--;
+    accountingdb.params.creationDateTime = flags.creationDateTime;
+    flags.creationDateTimeFlag--;
+    accountingdb.params.accountId = flags.accountId;
+    flags.accountIdFlag--;
+    accountingdb.params.balanceId = flags.balanceId;
+    flags.balanceIdFlag--;
+    var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+    const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {
+	resolve(accountingdb.persistStatement());
+    }, 20)});
+    openPromise.then(persistPromise);	
+}
+/**
+ * persistBalance
+ */
+else if (flags.persistBalanceFlag && flags.typeCodeIdFlag &&
+	 flags.proprietaryTypeFlag && flags.subTypeCodeIdFlag &&
+	 flags.ammountFlag && flags.creditDebitFlag && flags.numberOfEntries && flags.sumOfEntries) {
+    flags.persistBalanceFlag--;
+    accountingdb.params.typeCodeId = flags.typeCodeId;
+    flags.typeCodeIdFlag--;
+    accountingdb.params.proprietaryType = flags.proprietaryType;
+    flags.proprietaryTypeFlag--;
+    accountingdb.params.subTypeCodeId = flags.subTypeCodeId;
+    flags.subTypeCodeIdFlag--;
+    accountingdb.params.ammount = flags.ammount;
+    flags.ammountFlag--;
+    accountingdb.params.creditDebit = flags.creditDebit;
+    flags.creditDebitFlag--;
+    if (flags.dateTimeFlag > 0) {
+	accountingdb.params.dateTime = flags.dateTime;
+	flags.dateTimeFlag--;
+    }
+    else
+	accountingdb.params.dateTime = '0';
+    accountingdb.params.numberOfEntries = flags.numberOfEntries;
+    flags.numberOfEntriesFlag--;
+    accountingdb.params.sumOfEntries = flags.sumOfEntries;
+    flags.sumOfEntriesFlag--;
+    var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+    const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {
+	resolve(accountingdb.persistBalance());
+    }, 20)});
+    openPromise.then(persistPromise);	
+}
+/**
+ * accountByIban
+ */
+else if (flags.accountByIbanFlag && flags.ibanFlag) {
+    accountingdb.params.iban = flags.iban;
+    var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+    const queryPromise = new Promise((resolve, reject) => {setTimeout(() => {
+	resolve(accountingdb.getAccountByIban());
+    }, 50)});
+    openPromise.then(queryPromise);
+}
+/**
+ * currencyByCode
+ */
+else if (flags.currencyByCodeFlag && flags.codeFlag) {
+    accountingdb.params.code = flags.code;
+    var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+    const queryPromise = new Promise((resolve, reject) => {setTimeout(() => {
+	resolve(accountingdb.getCurrencyByCode());
+    }, 50)});
+    openPromise.then(queryPromise);
+}
+/**
+ * currencyBySymbol
+ */
+else if (flags.currencyBySymbolFlag && flags.symbolFlag) {
+    accountingdb.params.symbol = flags.symbol;
+    var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
+    const queryPromise = new Promise((resolve, reject) => {setTimeout(() => {
+	resolve(accountingdb.getCurrencyBySymbol());
+    }, 50)});
+    openPromise.then(queryPromise);
+}
+console.log("***>===============================<***");
