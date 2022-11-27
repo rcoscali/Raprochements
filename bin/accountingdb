@@ -507,10 +507,10 @@ for (let i = 2; i < process.argv.length; i++) {
      * --verbose | -v
      */
     if (process.argv[i] === "--verbose" || process.argv[i] === "-v") {
-	var numberRE = '/[0-9]+/';
-	if (process.argv[i+1].match(numberRE))
-	    flags.verboseFlag += process.argv[++i];
-	else
+        var numberRE = '/[0-9]+/';
+        if (process.argv[i+1].match(numberRE))
+            flags.verboseFlag += process.argv[++i];
+        else
             flags.verboseFlag++;
         console.log("[accountingdb] verbose = %d", flags.verboseFlag);
     }
@@ -523,7 +523,7 @@ for (let i = 2; i < process.argv.length; i++) {
         commandString = '--help';
         console.log("[accountingdb] %s", commandString);
         printHelp();
-	process.exit(1);
+        process.exit(1);
     }
 
     /**
