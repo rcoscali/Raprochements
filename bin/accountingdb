@@ -321,7 +321,7 @@ function doRestoreDB() {
  * Delete SQLite DB File
  */
 
-console.log('initdb: argc = '+process.argv.length+' ...');
+console.log('accountingdb: argc = '+process.argv.length+' ...');
 let argc = 0;
 process.argv.forEach(element => console.log('initdb: argv['+(argc)+'] = '+process.argv[(argc++)]+' ...'));
 
