@@ -23,8 +23,6 @@ var debug = require('debug')('rapr,express,accountingdb:*');
 var fs = require('fs');
 // Child process for running system commands
 const { exec } = require("child_process");
-// Request promise
-var rp = require('request-promise');
 
 function printHelp() {
     console.log("accountingdb: Usage: accountingdb [OPTIONS] [COMMAND] [ARGUMENTS]");
