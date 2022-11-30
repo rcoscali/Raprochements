@@ -12,7 +12,11 @@
                 "<node_internals>/**"
             ],
             "type": "node",
-            "args": ["--account-by-iban", "--iban", "FR76928836647839290734"]
+            "args": [
+                "--account-by-iban",
+                "--iban",
+                "FR76928836647839290734"
+            ]
         },
         {
             "name": "Debug missing arg account-by-iban",
@@ -22,7 +26,9 @@
                 "<node_internals>/**"
             ],
             "type": "node",
-            "args": ["--account-by-iban"]
+            "args": [
+                "--account-by-iban"
+            ]
         },
         {
             "name": "Debug persist-account",
@@ -32,8 +38,33 @@
                 "<node_internals>/**"
             ],
             "type": "node",
-            "args": ["--persist-account", "--iban", "FR76928836647839290734", "--currencyId", "1", "--bankId", "2"]
+            "args": [
+                "--persist-account",
+                "--iban",
+                "FR76928836647839290734",
+                "--currencyId",
+                "1",
+                "--bankId",
+                "2"
+            ]
+        },
+        {
+            "type": "node",
+            "name": "vscode-jest-tests.v2",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "internalConsoleOptions": "neverOpen",
+            "disableOptimisticBPs": true,
+            "program": "${workspaceFolder}\\jest",
+            "cwd": "${workspaceFolder}",
+            "args": [
+                "--runInBand",
+                "--watchAll=false",
+                "--testNamePattern",
+                "${jest.testNamePattern}",
+                "--runTestsByPath",
+                "${jest.testFile}"
+            ]
         }
-
     ]
 }
