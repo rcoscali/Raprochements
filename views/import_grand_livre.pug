@@ -1,0 +1,14 @@
+﻿extends layout
+
+block content
+  h1
+    center
+      | #{content}
+  p
+    input(type="textbox", id="datepicker")
+  script(type="text/javascript").
+    $.datepicker.setDefaults( $.datepicker.regional[ "fr" ] );
+    $( "#datepicker" ).datepicker({
+       autoclose: true,
+       showOn: both
+    }).datepicker('update', new Date());

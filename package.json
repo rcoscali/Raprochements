@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "nodemon ./bin/www",
-    "debug": "set DEBUG='express:*,rapr:*' & node --trace-warnings --inspect ./bin/www",
+    "debug": "set DEBUG='express:*,rapr:*' & nodemon --trace-warnings --inspect ./bin/www",
     "initdb": "node ./bin/accountingdb -- --init-db",
     "dumpdb": "node ./bin/accountingdb -- --dump-db",
     "restoredb": "node ./bin/accountingdb -- --restore-db",

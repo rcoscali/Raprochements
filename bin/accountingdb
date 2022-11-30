@@ -26,6 +26,9 @@ const { exec } = require("child_process");
 
 function printHelp() {
     console.log("accountingdb: Usage: accountingdb [OPTIONS] [COMMAND] [ARGUMENTS]");
+    console.log("                     This script provides maintainance features for the web application. More");
+    console.log("                     specifically it provides database initialization features and all persistent");
+    console.log("                     objects manipulations.");
     console.log("                     OPTIONS:");
     console.log("                              -v|--verbose             be more verbose when running.");
     console.log("                              -h|--help                display this help message.");
@@ -932,7 +935,7 @@ else if (flags.persistBalanceFlag && flags.typeCodeIdFlag &&
     const persistPromise = new Promise((resolve, reject) => {setTimeout(() => {
         resolve(accountingdb.persistBalance());
     }, 20)});
-    openPromise.then(persistPromise);   
+    openPromise.then(persistPromise);
 }
 /**
  * accountByIban
@@ -949,10 +952,9 @@ else if (flags.accountByIbanFlag && flags.ibanFlag) {
  * currencyByCode
  */
 else if (flags.currencyByCodeFlag && flags.codeFlag) {
-    accountingdb.params.code = flags.code;
     var openPromise = new Promise((resolve, reject) => {resolve(accountingdb.openDb())});
     const queryPromise = new Promise((resolve, reject) => {setTimeout(() => {
-        resolve(accountingdb.getCurrencyByCode());
+        resolve(accountingdb.getCurrencyByCode(flags.code));
     }, 50)});
     openPromise.then(queryPromise);
 }
